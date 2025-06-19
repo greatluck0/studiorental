@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>장비 대여 관리 시스템</title>
+  <style>
+    body { font-family: "맑은고딕"; margin: 0; padding: 0;
+   -ms-overflow-style: none;
+ }
+ 
+::-webkit-scrollbar {
+  display: none;
+  
+  }
+    .container { display: flex; height: 100vh; }
+    .left, .right {
+      padding: 20px;
+      overflow-y: auto;
+    }
+    .left { flex: 3; border-right: 1px solid #ccc; }
+    .right { flex: 1; background-color: #f9f9f9; }
+    input, button, select { margin: 5px; padding: 5px; }
+    .section { margin-top: 30px; border-top: 1px solid #ccc; padding-top: 20px; padding-bottom: 20px;}
+    .returned { color: green; }
+    .missing { color: red; }
+    table { border-collapse: collapse; margin-top: 10px; width: 100%; }
+    th{ background-color:#f5f5f5}
+    th, td { border: 1px solid #aaa; padding: 8px; text-align: center; }
+    h2 { margin-top: 0; }
+    #editModal, #equipmentModal, #rentalModal {
+      display:none; position:fixed; top:10%; left:30%; width:40%;
+      background:#fff; border:1px solid #ccc; padding:20px;
+      z-index:1000; box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+      max-height: 80%; overflow-y: auto;
+    }
+
+.top{
+    white-space: nowrap;
+    box-sizing: border-box;
+    overflow: hidden;
+    background-color: #cbcbcb;
+}
+
+p{
+  display: inline-block;
+  animation: text-to-right 60s linear infinite;
+}
+
+/*왼쪽에서 오른쪽으로 텍스트가 흐르는 애니메이션*/
+@keyframes text-to-right {
+  0% {
+    transform: translateX(-50%);
+  }
+  100% {
+    transform: translateX(0%);
+  }
+}
+
+/*오른쪽에서 왼쪽으로 텍스트가 흐르는 애니메이션*/
+@keyframes text-to-left {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+    #currentDateTime {
+      position: relative;
+      top: 0px;
+      right: 0px;
+      font-size: 1em;
+      text-align: right;
+    }
+
+  </style>
+</head>
+<body>
+<div class="top">
+	<p>미디어영상학과 스튜디오 장비 입출고 관리 체계 ✦ 미디어영상학과 스튜디오 장비 입출고 관리 체계 ✦ 미디어영상학과 스튜디오 장비 입출고 관리 체계 ✦ 미디어영상학과 스튜디오 장비 입출고 관리 체계 ✦ 미디어영상학과 스튜디오 장비 입출고 관리 체계 ✦ 미디어영상학과 스튜디오 장비 입출고 관리 체계 ✦ 미디어영상학과 스튜디오 장비 입출고 관리 체계 ✦ 미디어영상학과 스튜디오 장비 입출고 관리 체계 ✦ 미디어영상학과 스튜디오 장비 입출고 관리 체계 ✦ 미디어영상학과 스튜디오 장비 입출고 관리 체계 ✦ 미디어영상학과 스튜디오 장비 입출고 관리 체계 ✦ 미디어영상학과 스튜디오 장비 입출고 관리 체계 ✦ 미디어영상학과 스튜디오 장비 입출고 관리 체계 ✦ 미디어영상학과 스튜디오 장비 입출고 관리 체계 ✦ </p>
+</div>
+  <div class="container">
+    <div class="left">
+      <div style="background-color: rgb(0, 54, 170); padding-top: 10px; padding-left: 20px; padding-bottom: 0px;"><img src="logo.png">
+
+      <section style="float: right;color: white; font-weight: bold;">        
+        <a onclick="location.reload()">새로고침</a>
+        　
+        <a onclick="openRentalModal()">신규 대여</a>
+        　
+        <a onclick="openEquipmentModal()";>장비등록</a>
+        　
+      </section>
+
+      
+      
+      </div>      
+
+
+        <div id="currentDateTime">
+          <div id="currentDate">0000-00-00</div><div id="currentTime" style="font-weight: bold;">00:00:00</div>
+        </div>
+      <input type="text" id="searchName" placeholder="대여자 이름 검색">
+        <button onclick="searchRental()">조회</button> <input type="text" id="returnBarcode" placeholder="반납 바코드 스캔">
+      <div class="section">
+        
+        <table>
+          <thead><tr><th>대여자</th><th>대여일자</th><th>장비 수</th><th>선택</th><th>삭제</th></tr></thead>
+          <tbody id="rentalTableBody"></tbody>
+        </table>
+        <div id="currentInfo" style="margin-top:15px; font-weight: bold; font-size: 16px;"></div>
+        <table>
+          <thead><tr><th>바코드</th><th>장비명</th><th>상태</th><th>상태변경</th></tr></thead>
+          <tbody id="returnListTable"></tbody>
+        </table>
+        <button id="deleteRentalBtn" onclick="deleteRental()" disabled>기록 삭제</button>
+        
+      </div>
+
+    </div>
+
+    <div class="right">
+      <h2>전체 대여 목록</h2>
+      <table>
+        <thead><tr><th>대여자</th><th>날짜</th><th>장비 수</th><th>선택</th><th>수정</th></tr></thead>
+        <tbody id="allDataList"></tbody>
+      </table>
+    </div>
+  </div>
+<!-- 대여 등록 모달 -->
+<div id="rentalModal">
+  <h3>대여 등록</h3>
+  <input type="text" id="borrower" placeholder="대여자 이름"><br>
+  <input type="date" id="rentDate"><br>
+  <input type="text" id="barcodeInput" placeholder="장비 바코드 입력"><br>
+  <table style="width:100%; margin-top:10px;">
+    <thead><tr><th>바코드</th><th>장비명</th><th>삭제</th></tr></thead>
+    <tbody id="rentalListTable"></tbody>
+  </table>
+  <button onclick="saveRental()">저장</button>
+  <button onclick="cancelRental()">취소</button>
+  <button onclick="closeRentalModal()">닫기</button>
+</div>
+
+<!-- 수정 모달 -->
+<div id="editModal">
+  <h3>대여 정보 수정</h3>
+  <input type="text" id="editBorrower" placeholder="대여자 이름" disabled><br>
+  <input type="date" id="editDate" disabled><br>
+  <input type="text" id="editBarcodeInput" placeholder="장비 바코드 추가"><br>
+  <table style="width:100%; margin-top:10px;">
+    <thead><tr><th>바코드</th><th>장비명</th><th>삭제</th></tr></thead>
+    <tbody id="editTableBody"></tbody>
+  </table>
+  <button onclick="saveEdit()">저장</button>
+  <button onclick="closeEditModal()">닫기</button>
+</div>
+
+<!-- 장비 등록 모달 -->
+<div id="equipmentModal">
+  <h3>장비 등록</h3>
+  <input type="text" id="registerBarcode" placeholder="바코드"><br>
+  <input type="text" id="registerName" placeholder="장비명"><br>
+  <button onclick="addEquipment()">등록</button>
+  <button onclick="closeEquipmentModal()">닫기</button>
+  <ul id="equipmentListDisplay" style="margin-top:10px;"></ul>
+</div>
+<script>
+let rentals = JSON.parse(localStorage.getItem("rentals")) || [];
+let tempRentalItems = [];
+let editingRentalIndex = null;
+let selectedReturnIndex = null;
+const equipmentList = JSON.parse(localStorage.getItem("equipmentList")) || {};
+
+    function updateCurrentTime() {
+      const now = new Date();
+      // 날짜
+      const year  = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day   = String(now.getDate()).padStart(2, '0');
+      document.getElementById('currentDate').textContent = `${year}-${month}-${day}`;
+      // 시각
+      const hours   = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const seconds = String(now.getSeconds()).padStart(2, '0');
+      document.getElementById('currentTime').textContent = `${hours}:${minutes}:${seconds}`;
+    }
+
+    updateCurrentTime();
+    setInterval(updateCurrentTime, 1000);
+
+
+function openRentalModal() {
+  document.getElementById("rentalModal").style.display = "block";
+}
+function closeRentalModal() {
+  document.getElementById("rentalModal").style.display = "none";
+}
+function openEquipmentModal() {
+  document.getElementById("equipmentModal").style.display = "block";
+}
+function closeEquipmentModal() {
+  document.getElementById("equipmentModal").style.display = "none";
+}
+function openEditModal() {
+  document.getElementById("editModal").style.display = "block";
+}
+function closeEditModal() {
+  document.getElementById("editModal").style.display = "none";
+}
+
+// 장비 등록
+function addEquipment() {
+  const code = document.getElementById("registerBarcode").value.trim();
+  const name = document.getElementById("registerName").value.trim();
+  if (!code || !name) return alert("바코드와 장비명을 모두 입력하세요.");
+  equipmentList[code] = name;
+  localStorage.setItem("equipmentList", JSON.stringify(equipmentList));
+  document.getElementById("registerBarcode").value = "";
+  document.getElementById("registerName").value = "";
+  renderEquipmentList();
+}
+
+function renderEquipmentList() {
+  const ul = document.getElementById("equipmentListDisplay");
+  ul.innerHTML = "";
+  for (const code in equipmentList) {
+    const li = document.createElement("li");
+    li.innerHTML = `${code} : ${equipmentList[code]} <button onclick="deleteEquipment('${code}')">삭제</button>`;
+    ul.appendChild(li);
+  }
+}
+
+function deleteEquipment(code) {
+  if (!confirm("이 장비 정보를 삭제하시겠습니까?")) return;
+  delete equipmentList[code];
+  localStorage.setItem("equipmentList", JSON.stringify(equipmentList));
+  renderEquipmentList();
+}
+document.getElementById("barcodeInput").addEventListener("keypress", function(e) {
+  if (e.key === "Enter") {
+    const code = e.target.value.trim();
+    if (!code) return;
+    const name = equipmentList[code] || "(이름 미등록)";
+    tempRentalItems.push({ barcode: code, name, returned: false });
+    renderRentalList();
+    e.target.value = "";
+  }
+});
+
+function renderRentalList() {
+  const tbody = document.getElementById("rentalListTable");
+  tbody.innerHTML = "";
+  tempRentalItems.forEach((item, i) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${item.barcode}</td><td>${item.name}</td><td><button onclick="deleteTempItem(${i})">삭제</button></td>`;
+    tbody.appendChild(tr);
+  });
+}
+function deleteTempItem(i) {
+  tempRentalItems.splice(i, 1);
+  renderRentalList();
+}
+
+function saveRental() {
+  const borrower = document.getElementById("borrower").value.trim();
+  const rentDate = document.getElementById("rentDate").value;
+  if (!borrower || !rentDate || tempRentalItems.length === 0) {
+    alert("모든 정보를 입력하고 장비를 등록해주세요.");
+    return;
+  }
+  rentals.push({ borrower, rentDate, items: [...tempRentalItems] });
+  localStorage.setItem("rentals", JSON.stringify(rentals));
+  tempRentalItems = [];
+  document.getElementById("borrower").value = "";
+  document.getElementById("rentDate").value = "";
+  renderRentalList();
+  renderAllData();
+  alert("대여 등록이 완료되었습니다.");
+  closeRentalModal();
+}
+
+function cancelRental() {
+  tempRentalItems = [];
+  renderRentalList();
+  closeRentalModal();
+}
+
+function renderAllData() {
+  const tbody = document.getElementById("allDataList");
+  tbody.innerHTML = "";
+  rentals.forEach((r, idx) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${r.borrower}</td><td>${r.rentDate}</td><td>${r.items.length}</td><td><button onclick="selectReturn(${idx})">선택</button></td><td><button onclick="editRental(${idx})">수정</button></td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function searchRental() {
+  const name = document.getElementById("searchName").value.trim();
+  const tbody = document.getElementById("rentalTableBody");
+  tbody.innerHTML = "";
+  rentals.forEach((r, idx) => {
+    if (r.borrower.includes(name)) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${r.borrower}</td><td>${r.rentDate}</td><td>${r.items.length}</td><td><button onclick="selectReturn(${idx})">선택</button></td><td><button onclick="deleteRental(${idx})">삭제</button></td>`;
+      tbody.appendChild(tr);
+    }
+  });
+}
+
+function selectReturn(index) {
+  selectedReturnIndex = index;
+  const r = rentals[index];
+  document.getElementById("currentInfo").innerText = `선택된 대여자: ${r.borrower} (${r.rentDate})`;
+  document.getElementById("deleteRentalBtn").disabled = false;
+  renderReturnList(r);
+}
+
+document.getElementById("returnBarcode").addEventListener("keypress", function(e) {
+  if (e.key === "Enter" && selectedReturnIndex !== null) {
+    const code = e.target.value.trim();
+    const rental = rentals[selectedReturnIndex];
+
+    // 미반납된 동일 바코드 중 가장 앞에 있는 항목을 찾음
+    const item = rental.items.find(i => i.barcode === code && !i.returned);
+
+    if (item) {
+      item.returned = true;
+      localStorage.setItem("rentals", JSON.stringify(rentals));
+      renderReturnList(rental);
+    } else {
+      alert("해당 장비는 이 대여 목록에 없거나 이미 모두 반납되었습니다.");
+    }
+
+    e.target.value = "";
+  }
+});
+
+function renderReturnList(rental) {
+  const tbody = document.getElementById("returnListTable");
+  tbody.innerHTML = "";
+  rental.items.forEach((item, i) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${item.barcode}</td><td>${item.name}</td><td class="${item.returned ? 'returned' : 'missing'}">${item.returned ? '반납완료' : '미반납'}</td><td><button onclick="toggleReturn(${i})">변경</button></td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function toggleReturn(i) {
+  if (selectedReturnIndex === null) return;
+  const rental = rentals[selectedReturnIndex];
+  rental.items[i].returned = !rental.items[i].returned;
+  localStorage.setItem("rentals", JSON.stringify(rentals));
+  renderReturnList(rental);
+}
+
+function deleteRental(index = selectedReturnIndex) {
+  if (index === null || index >= rentals.length) return;
+  if (!confirm("이 대여 기록을 삭제하시겠습니까?")) return;
+  rentals.splice(index, 1);
+  localStorage.setItem("rentals", JSON.stringify(rentals));
+  selectedReturnIndex = null;
+  document.getElementById("currentInfo").innerText = "";
+  document.getElementById("deleteRentalBtn").disabled = true;
+  document.getElementById("returnListTable").innerHTML = "";
+  searchRental();
+  renderAllData();
+}
+
+function editRental(index) {
+  editingRentalIndex = index;
+  const rental = rentals[index];
+  document.getElementById("editBorrower").value = rental.borrower;
+  document.getElementById("editDate").value = rental.rentDate;
+  openEditModal();
+  renderEditTable(rental.items);
+}
+
+document.getElementById("editBarcodeInput").addEventListener("keypress", function(e) {
+  if (e.key === "Enter") {
+    const code = e.target.value.trim();
+    if (!code || editingRentalIndex === null) return;
+    const name = equipmentList[code] || "(이름 미등록)";
+    rentals[editingRentalIndex].items.push({ barcode: code, name, returned: false });
+    renderEditTable(rentals[editingRentalIndex].items);
+    e.target.value = "";
+  }
+});
+
+function renderEditTable(items) {
+  const tbody = document.getElementById("editTableBody");
+  tbody.innerHTML = "";
+  items.forEach((item, i) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${item.barcode}</td><td>${item.name}</td><td><button onclick="deleteEditItem(${i})">삭제</button></td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function deleteEditItem(i) {
+  if (editingRentalIndex === null) return;
+  rentals[editingRentalIndex].items.splice(i, 1);
+  renderEditTable(rentals[editingRentalIndex].items);
+}
+
+function saveEdit() {
+  if (editingRentalIndex === null) return;
+  localStorage.setItem("rentals", JSON.stringify(rentals));
+  if (selectedReturnIndex === editingRentalIndex) {
+    renderReturnList(rentals[editingRentalIndex]);
+  }
+  renderAllData();
+  closeEditModal();
+}
+
+// 초기 실행
+renderAllData();
+renderEquipmentList();
+</script>
+</body>
+</html>
