@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>장비대여 신규 신청 가능 여부 검사기</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #f5f6f8;
+    padding: 30px;
+    color: #222;
+  }
+
+  h1 { margin-bottom: 6px; }
+  p { color: #666; }
+
+  .container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  .box,
+  #result {
+    background: white;
+    padding: 20px;
+    border-radius: 14px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  }
+
+  textarea {
+    width: 100%;
+    height: 430px;
+    padding: 14px;
+    font-size: 14px;
+    line-height: 1.5;
+    border-radius: 10px;
+    border: 1px solid #ccc;
+    box-sizing: border-box;
+    resize: vertical;
+  }
+
+  button {
+    margin: 20px 0;
+    padding: 15px 24px;
+    background: #111;
+    color: white;
+    border: none;
+    border-radius: 9px;
+    font-size: 15px;
+    cursor: pointer;
+  }
+
+  button:hover { background: #333; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+    font-size: 14px;
+  }
+
+  th, td {
+    border-bottom: 1px solid #e5e5e5;
+    padding: 8px;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  th { background: #fafafa; }
+
+  .danger { color: #c62828; font-weight: bold; }
+  .safe { color: #2e7d32; font-weight: bold; }
+  .warn { color: #ef6c00; font-weight: bold; }
+
+  .section {
+    margin-top: 28px;
+    padding-top: 12px;
+    border-top: 1px solid #ddd;
+  }
+</style>
+</head>
+
+<body>
+
+<h1>장비대여 신규 신청 가능 여부 검사기</h1>
+<p>
+  기존 신청완료건과 신규 신청건을 비교하여, 시간 구간별 실제 최대 사용량 기준으로 최종 승인 가능 여부를 판단합니다.
+</p>
+
+<div class="container">
+  <div class="box">
+    <h2>기존 대여 신청완료건</h2>
+    <textarea id="existingText" placeholder="기존 승인 완료 신청건 여러 개를 붙여 넣으세요."></textarea>
+  </div>
+
+  <div class="box">
+    <h2>신규 대여 신청건</h2>
+    <textarea id="newText" placeholder="신규 신청 1건을 붙여 넣으세요."></textarea>
+  </div>
+</div>
+
+<button onclick="checkNewApplication()">신규 신청 가능 여부 확인</button>
+
+<div id="result">검사 전입니다.</div>
+
+<script>
+const inventory = {
+  "소니 A7M3 셋트": 3,
+  "캐논 EOS 6D 셋트": 1,
+  "캐논 EOS 80D 셋트": 2,
+  "캐논 EOS 90D 셋트": 1,
+  "캐논 캠코더 XA20 셋트": 0,
+  "소니 FE 24-70mm F4 ZA OSS": 3,
+  "캐논 EF-S 17-55mm F2.8 IS USM": 2,
+  "캐논 EF-S 10-22mm F3.5-4.5 USM": 1,
+  "캐논 EF-S 18-135mm F3.5-5.6 IS USM": 2,
+  "캐논 EF-S 24mm F2.8 STM": 2,
+  "SIGMA A 30mm F1.4 DC HSM 캐논 EF-S용": 2,
+  "캐논 EF 50mm F1.8 STM": 2,
+  "캐논 EF 24-105mm F4 L IS USM": 1,
+  "캐논 EF 85mm F1.8 USM": 2,
+  "캐논 EF 70-300mm F4-5.6 L IS USM": 1,
+  "캐논 EF 70-200mm F2.8 L IS USM III": 1,
+  "SIGMA MC-11 EF-FE 마운트 컨버터": 2,
+  "RODE 로데 붐마이크 셋트": 2,
+  "TASCAM DR-70D 오디오 레코더": 2,
+  "로데 비디오 마이크 프로 플러스": 2,
+  "로데 비디오 마이크로": 1,
+  "RODE Wireless GO 무선 외장마이크": 4,
+  "Cinetree L-600A": 5,
+  "Cinetree L-600A용 조명 필터 (조명판) 화이트": 1,
+  "NANLITE MixPanel 150": 3,
+  "GODOX SL-60W LED조명": 3,
+  "양면반사판": 6,
+  "고보 (직사각)": 2,
+  "A스탠드": 8,
+  "C스탠드": 2,
+  "중형트라이포드": 4,
+  "소형트라이포드": 3,
+  "DJI 드론": 1,
+  "슬라이더": 2,
+  "SD카드": 3,
+  "필월드 필드모니터": 1,
+  "가변 ND필터": 2,
+  "V마운트배터리": 8,
+  "캐논 추가배터리": 3,
+  "소니 추가배터리": 3,
+  "캐리어": 2,
+  "SD카드리더기": 1
+};
+
+function normalizeName(name) {
+  return name.replace(/\s+/g, " ").trim();
+}
+
+function parseApplications(text, type) {
+  const blocks = text
+    .split(/(?=\[장비대여 신청\])/g)
+    .filter(block => block.includes("대여일시:"));
+
+  return blocks.map((block, index) => {
+    const nameMatch = block.match(/이\s*름:\s*(.+)/);
+    const startMatch = block.match(/대여일시:\s*([0-9T:\-]+)/);
+    const endMatch = block.match(/반납일시:\s*([0-9T:\-]+)/);
+
+    const borrowerName = nameMatch
+      ? nameMatch[1].trim()
+      : type === "new"
+        ? "신규 신청자"
+        : `이름 미확인 ${index + 1}`;
+
+    const items = {};
+    const itemRegex = /^(.+?)\s*\((\d+)개\)/gm;
+    let match;
+
+    while ((match = itemRegex.exec(block)) !== null) {
+      const itemName = normalizeName(match[1]);
+      const qty = Number(match[2]);
+      items[itemName] = (items[itemName] || 0) + qty;
+    }
+
+    return {
+      id: `${type}-${index + 1}`,
+      borrowerName,
+      label: type === "new" ? `신규 신청: ${borrowerName}` : borrowerName,
+      type,
+      start: startMatch ? new Date(startMatch[1]) : null,
+      end: endMatch ? new Date(endMatch[1]) : null,
+      items
+    };
+  }).filter(app => app.start && app.end);
+}
+
+function formatDate(date) {
+  return date.toLocaleString("ko-KR", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  });
+}
+
+function checkNewApplication() {
+  const existingText = document.getElementById("existingText").value;
+  const newText = document.getElementById("newText").value;
+  const result = document.getElementById("result");
+
+  const existingApps = parseApplications(existingText, "existing");
+  const newApps = parseApplications(newText, "new");
+
+  if (newApps.length !== 1) {
+    result.innerHTML = `<p class="danger">신규 신청건은 반드시 1건만 입력해 주세요.</p>`;
+    return;
+  }
+
+  const newApp = newApps[0];
+  const allApps = [...existingApps, newApp];
+
+  const timePoints = [];
+
+  allApps.forEach(app => {
+    if (app.end > newApp.start && app.start < newApp.end) {
+      timePoints.push(app.start.getTime());
+      timePoints.push(app.end.getTime());
+    }
+  });
+
+  timePoints.push(newApp.start.getTime());
+  timePoints.push(newApp.end.getTime());
+
+  const sortedTimes = [...new Set(timePoints)]
+    .sort((a, b) => a - b)
+    .map(time => new Date(time))
+    .filter(time => time >= newApp.start && time <= newApp.end);
+
+  const segments = [];
+  const conflictSummary = {};
+
+  for (let i = 0; i < sortedTimes.length - 1; i++) {
+    const segStart = sortedTimes[i];
+    const segEnd = sortedTimes[i + 1];
+
+    if (segStart >= segEnd) continue;
+
+    const activeApps = allApps.filter(app =>
+      app.start < segEnd && app.end > segStart
+    );
+
+    if (!activeApps.some(app => app.type === "new")) continue;
+
+    const usedItems = {};
+
+    activeApps.forEach(app => {
+      Object.entries(app.items).forEach(([name, qty]) => {
+        usedItems[name] = (usedItems[name] || 0) + qty;
+      });
+    });
+
+    const rows = Object.entries(usedItems).map(([name, used]) => {
+      const stock = inventory[name];
+
+      if (stock === undefined) {
+        return {
+          name,
+          used,
+          stock: "미등록",
+          status: "unknown",
+          shortage: "-"
+        };
+      }
+
+      if (used > stock) {
+        const shortage = used - stock;
+
+        if (!conflictSummary[name]) {
+          conflictSummary[name] = {
+            stock,
+            maxUsed: used,
+            maxShortage: shortage,
+            periods: []
+          };
+        } else {
+          conflictSummary[name].maxUsed = Math.max(conflictSummary[name].maxUsed, used);
+          conflictSummary[name].maxShortage = Math.max(conflictSummary[name].maxShortage, shortage);
+        }
+
+        conflictSummary[name].periods.push(
+          `${formatDate(segStart)} ~ ${formatDate(segEnd)}`
+        );
+
+        return {
+          name,
+          used,
+          stock,
+          status: "danger",
+          shortage
+        };
+      }
+
+      if (used === stock) {
+        return {
+          name,
+          used,
+          stock,
+          status: "warn",
+          shortage: 0
+        };
+      }
+
+      return {
+        name,
+        used,
+        stock,
+        status: "safe",
+        shortage: 0
+      };
+    }).sort((a, b) => {
+      const order = {
+        danger: 0,
+        warn: 1,
+        unknown: 2,
+        safe: 3
+      };
+      return order[a.status] - order[b.status];
+    });
+
+    segments.push({
+      start: segStart,
+      end: segEnd,
+      activeApps,
+      rows
+    });
+  }
+
+  const conflictItems = Object.entries(conflictSummary);
+  const isApproved = conflictItems.length === 0;
+
+  let html = "";
+
+  if (isApproved) {
+    html += `<h2 class="safe">최종 판정: 신규 신청 승인 가능</h2>`;
+    html += `<p>신규 신청 기간 전체를 시간대별로 나누어 검사한 결과, 보유 수량을 초과하는 장비가 없습니다.</p>`;
+  } else {
+    html += `<h2 class="danger">최종 판정: 신규 신청 승인 불가</h2>`;
+    html += `<p>신규 신청 기간 중 일부 시간대에서 학과 보유 수량을 초과합니다.</p>`;
+
+    html += `
+      <h3>초과 장비 요약</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>장비명</th>
+            <th>최대 사용 수량</th>
+            <th>보유 수량</th>
+            <th>최대 부족 수량</th>
+            <th>초과 발생 시간</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    conflictItems.forEach(([name, data]) => {
+      html += `
+        <tr>
+          <td>${name}</td>
+          <td>${data.maxUsed}</td>
+          <td>${data.stock}</td>
+          <td class="danger">${data.maxShortage}개 부족</td>
+          <td>${data.periods.join("<br>")}</td>
+        </tr>
+      `;
+    });
+
+    html += `
+        </tbody>
+      </table>
+    `;
+  }
+
+  html += `<p><b>신규 신청 기간:</b> ${formatDate(newApp.start)} ~ ${formatDate(newApp.end)}</p>`;
+
+  if (segments.length === 0) {
+    html += `<p class="safe">신규 신청과 겹치는 기존 신청이 없습니다.</p>`;
+  }
+
+  html += `<div class="section"><h3>시간대별 상세 검사</h3></div>`;
+
+  segments.forEach(seg => {
+    const hasDanger = seg.rows.some(row => row.status === "danger");
+
+    html += `
+      <div class="section">
+        <h3 class="${hasDanger ? "danger" : "safe"}">
+          ${formatDate(seg.start)} ~ ${formatDate(seg.end)}
+          ${hasDanger ? " / 초과 발생" : " / 정상"}
+        </h3>
+        <p><b>해당 구간 활성 신청:</b> ${seg.activeApps.map(app => app.label).join(", ")}</p>
+        <table>
+          <thead>
+            <tr>
+              <th>장비명</th>
+              <th>총 사용 수량</th>
+              <th>보유 수량</th>
+              <th>판정</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+
+    seg.rows.forEach(row => {
+      let statusText = "";
+
+      if (row.status === "danger") {
+        statusText = `<span class="danger">초과 ${row.shortage}개 부족</span>`;
+      } else if (row.status === "warn") {
+        statusText = `<span class="warn">최대치 사용</span>`;
+      } else if (row.status === "unknown") {
+        statusText = `<span class="warn">보유목록 미등록</span>`;
+      } else {
+        statusText = `<span class="safe">정상</span>`;
+      }
+
+      html += `
+        <tr>
+          <td>${row.name}</td>
+          <td>${row.used}</td>
+          <td>${row.stock}</td>
+          <td>${statusText}</td>
+        </tr>
+      `;
+    });
+
+    html += `
+          </tbody>
+        </table>
+      </div>
+    `;
+  });
+
+  result.innerHTML = html;
+}
+</script>
+
+</body>
+</html>
