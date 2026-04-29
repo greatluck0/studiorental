@@ -32,7 +32,8 @@ p {
 }
 
 .box,
-#result {
+#result,
+#remainingResult {
   background: white;
   padding: 20px;
   border-radius: 14px;
@@ -50,8 +51,23 @@ textarea {
   resize: vertical;
 }
 
+input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+label {
+  display: block;
+  margin-top: 10px;
+  margin-bottom: 6px;
+  font-weight: bold;
+}
+
 button {
-  margin: 20px 0;
+  margin: 20px 8px 20px 0;
   padding: 15px 24px;
   background: #111;
   color: white;
@@ -98,6 +114,12 @@ th {
   border-top: 1px solid #ddd;
 }
 
+#inventoryPanel,
+#remainingResult {
+  display: none;
+  margin-bottom: 20px;
+}
+
 @media (max-width: 768px) {
   body { padding: 14px; }
 
@@ -114,7 +136,8 @@ th {
   }
 
   .box,
-  #result {
+  #result,
+  #remainingResult {
     padding: 16px;
     border-radius: 12px;
   }
@@ -126,13 +149,55 @@ th {
 
   button {
     width: 100%;
+    margin: 12px 0 0 0;
     padding: 16px;
     font-size: 16px;
   }
 
+  .table-wrap {
+    overflow-x: visible;
+  }
+
   table {
+    min-width: 0;
+    width: 100%;
+    border: 0;
+  }
+
+  table thead {
+    display: none;
+  }
+
+  table,
+  tbody,
+  tr,
+  td {
+    display: block;
+    width: 100%;
+  }
+
+  tr {
+    background: #fff;
+    border: 1px solid #e5e5e5;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    padding: 10px;
+  }
+
+  td {
+    border-bottom: none;
+    padding: 6px 4px;
     font-size: 13px;
-    min-width: 620px;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  td::before {
+    content: attr(data-label);
+    font-weight: bold;
+    color: #555;
+    flex-shrink: 0;
   }
 }
 </style>
@@ -143,6 +208,8 @@ th {
 <h1>장비대여 신규 신청 가능 여부 검사기</h1>
 <p>
 기존 신청완료건과 신규 신청건을 비교하여, 시간 구간별 실제 최대 사용량 기준으로 최종 승인 가능 여부를 판단합니다.
+<br>기존 신청완료건 데이터셋을 줄바꿈하여 여러개 입력하여야합니다.
+<br><b>[주의사항] </b>신청서 양식 준수 必 (정확한 장비명 : 캐논 EOS 90D 셋트 (1개) / 올바른 시간대 양식 : 2020-00-00T24:00)
 </p>
 
 <div class="container">
@@ -159,6 +226,33 @@ th {
 
 <button onclick="checkNewApplication()">신규 신청 가능 여부 확인</button>
 
+<!-- 
+<button onclick="toggleInventory()">전체 장비 인벤토리 보기</button>
+
+<div class="box" style="margin-bottom:20px;">
+  <h2>잔여장비 확인 시간대</h2>
+  <label>확인 시작</label>
+  <input id="remainStart" type="datetime-local">
+
+  <label>확인 종료</label>
+  <input id="remainEnd" type="datetime-local">
+
+  <button onclick="checkRemainingInventoryByTime()">선택 시간대 잔여장비 확인</button>
+</div>
+
+<div id="inventoryPanel" class="box">
+  <h2>전체 장비 인벤토리</h2>
+  <input
+    id="inventorySearch"
+    type="text"
+    placeholder="장비명 검색"
+    oninput="renderInventory()"
+  >
+  <div id="inventoryList"></div>
+</div>
+
+<div id="remainingResult">잔여장비 검사 전입니다.</div>
+-->
 <div id="result">검사 전입니다.</div>
 
 <script>
@@ -167,7 +261,6 @@ const inventory = {
   "캐논 EOS 6D 셋트": 1,
   "캐논 EOS 80D 셋트": 2,
   "캐논 EOS 90D 셋트": 1,
-  "캐논 캠코더 XA20 셋트": 0,
   "소니 FE 24-70mm F4 ZA OSS": 3,
   "캐논 EF-S 17-55mm F2.8 IS USM": 2,
   "캐논 EF-S 10-22mm F3.5-4.5 USM": 1,
@@ -186,7 +279,6 @@ const inventory = {
   "로데 비디오 마이크로": 1,
   "RODE Wireless GO 무선 외장마이크": 4,
   "Cinetree L-600A": 5,
-  "Cinetree L-600A용 조명 필터 (조명판) 화이트": 1,
   "NANLITE MixPanel 150": 3,
   "GODOX SL-60W LED조명": 3,
   "양면반사판": 6,
@@ -197,14 +289,13 @@ const inventory = {
   "소형트라이포드": 3,
   "DJI 드론": 1,
   "슬라이더": 2,
-  "SD카드": 3,
-  "필월드 필드모니터": 1,
   "가변 ND필터": 2,
   "V마운트배터리": 8,
   "캐논 추가배터리": 3,
   "소니 추가배터리": 3,
   "캐리어": 2,
-  "SD카드리더기": 1
+  "SD카드리더기": 3,
+  "스튜디오 대관 희망": 1
 };
 
 function normalizeName(name) {
@@ -264,10 +355,6 @@ function makeTable(html) {
   return `<div class="table-wrap">${html}</div>`;
 }
 
-function escapeRegExp(text) {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 function escapeHtml(text) {
   return text
     .replaceAll("&", "&amp;")
@@ -276,21 +363,31 @@ function escapeHtml(text) {
 }
 
 function createAdjustedApplicationText(originalText, newApp, conflictSummary) {
-  let adjustedText = originalText;
+  const lines = originalText.split("\n");
 
-  Object.entries(conflictSummary).forEach(([itemName, data]) => {
-    const originalQty = newApp.items[itemName] || 0;
+  const adjustedLines = lines.map(line => {
+    const match = line.match(/^(\s*)(.+?)\s*\((\d+)개\)(.*)$/);
+
+    if (!match) return line;
+
+    const indent = match[1];
+    const originalItemName = match[2].trim();
+    const originalQty = Number(match[3]);
+    const normalizedOriginalName = normalizeName(originalItemName);
+
+    const conflictEntry = Object.entries(conflictSummary).find(([conflictName]) => {
+      return normalizeName(conflictName) === normalizedOriginalName;
+    });
+
+    if (!conflictEntry) return line;
+
+    const [, data] = conflictEntry;
     const adjustedQty = Math.max(0, originalQty - data.maxShortage);
 
-    const regex = new RegExp(`^${escapeRegExp(itemName)}\\s*\\(\\d+개\\)`, "gm");
-
-    adjustedText = adjustedText.replace(
-      regex,
-      `${itemName} (${adjustedQty}개)  ← 수정사항`
-    );
+    return `${indent}${originalItemName} (${adjustedQty}개)  ← 수정사항`;
   });
 
-  return adjustedText.trim();
+  return adjustedLines.join("\n").trim();
 }
 
 function copyAdjustedText() {
@@ -301,17 +398,172 @@ function copyAdjustedText() {
     return;
   }
 
-  textarea.select();
-  textarea.setSelectionRange(0, 99999);
+  const text = textarea.value;
 
-  navigator.clipboard.writeText(textarea.value)
-    .then(() => {
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(() => {
       alert("수정 신청서가 복사되었습니다.");
-    })
-    .catch(() => {
-      document.execCommand("copy");
-      alert("수정 신청서가 복사되었습니다.");
+    }).catch(() => {
+      fallbackCopy(text);
     });
+  } else {
+    fallbackCopy(text);
+  }
+}
+
+function fallbackCopy(text) {
+  const temp = document.createElement("textarea");
+  temp.value = text;
+  document.body.appendChild(temp);
+  temp.select();
+  document.execCommand("copy");
+  document.body.removeChild(temp);
+  alert("수정 신청서가 복사되었습니다.");
+}
+
+function toggleInventory() {
+  const panel = document.getElementById("inventoryPanel");
+
+  if (panel.style.display === "none" || panel.style.display === "") {
+    panel.style.display = "block";
+    renderInventory();
+  } else {
+    panel.style.display = "none";
+  }
+}
+
+function renderInventory() {
+  const list = document.getElementById("inventoryList");
+  const searchInput = document.getElementById("inventorySearch");
+  const search = searchInput ? searchInput.value.trim().toLowerCase() : "";
+
+  const items = Object.entries(inventory)
+    .filter(([name]) => name.toLowerCase().includes(search))
+    .sort((a, b) => a[0].localeCompare(b[0], "ko"));
+
+  if (items.length === 0) {
+    list.innerHTML = `<p class="warn">검색 결과가 없습니다.</p>`;
+    return;
+  }
+
+  list.innerHTML = makeTable(`
+    <table>
+      <thead>
+        <tr>
+          <th>장비명</th>
+          <th>보유 수량</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${items.map(([name, qty]) => `
+          <tr>
+            <td data-label="장비명">${name}</td>
+            <td data-label="보유 수량"><b>${qty}</b>개</td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>
+  `);
+}
+
+function checkRemainingInventoryByTime() {
+  const existingText = document.getElementById("existingText").value;
+  const remainingResult = document.getElementById("remainingResult");
+
+  const startValue = document.getElementById("remainStart").value;
+  const endValue = document.getElementById("remainEnd").value;
+
+  if (!startValue || !endValue) {
+    remainingResult.style.display = "block";
+    remainingResult.innerHTML = `<p class="danger">잔여장비를 확인할 시작 시간과 종료 시간을 입력해 주세요.</p>`;
+    return;
+  }
+
+  const checkStart = new Date(startValue);
+  const checkEnd = new Date(endValue);
+
+  if (checkStart >= checkEnd) {
+    remainingResult.style.display = "block";
+    remainingResult.innerHTML = `<p class="danger">종료 시간은 시작 시간보다 늦어야 합니다.</p>`;
+    return;
+  }
+
+  const existingApps = parseApplications(existingText, "existing");
+
+  const activeApps = existingApps.filter(app =>
+    app.start < checkEnd && app.end > checkStart
+  );
+
+  const usedItems = {};
+
+  activeApps.forEach(app => {
+    Object.entries(app.items).forEach(([name, qty]) => {
+      usedItems[name] = (usedItems[name] || 0) + qty;
+    });
+  });
+
+  const rows = Object.entries(inventory).map(([name, stock]) => {
+    const used = usedItems[name] || 0;
+    const remaining = stock - used;
+
+    let status = "safe";
+    if (remaining < 0) status = "danger";
+    else if (remaining === 0) status = "warn";
+
+    return { name, stock, used, remaining, status };
+  }).sort((a, b) => {
+    const order = { danger: 0, warn: 1, safe: 2 };
+    return order[a.status] - order[b.status];
+  });
+
+  let html = `<h2>선택 시간대 잔여장비 현황</h2>`;
+  html += `<p><b>확인 시간:</b> ${formatDate(checkStart)} ~ ${formatDate(checkEnd)}</p>`;
+
+  if (activeApps.length > 0) {
+    html += `<p><b>해당 시간대 대여자:</b> ${activeApps.map(app => app.label).join(", ")}</p>`;
+  } else {
+    html += `<p class="safe"><b>해당 시간대에 겹치는 기존 신청이 없습니다.</b></p>`;
+  }
+
+  html += makeTable(`
+    <table>
+      <thead>
+        <tr>
+          <th>장비명</th>
+          <th>보유 수량</th>
+          <th>사용 중</th>
+          <th>잔여 수량</th>
+          <th>상태</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(row => {
+          let statusText = "";
+
+          if (row.status === "danger") {
+            statusText = `<span class="danger">초과 ${Math.abs(row.remaining)}개</span>`;
+          } else if (row.status === "warn") {
+            statusText = `<span class="warn">잔여 없음</span>`;
+          } else {
+            statusText = `<span class="safe">대여 가능</span>`;
+          }
+
+          return `
+            <tr>
+              <td data-label="장비명">${row.name}</td>
+              <td data-label="보유 수량">${row.stock}</td>
+              <td data-label="사용 중">${row.used}</td>
+              <td data-label="잔여 수량"><b>${row.remaining}</b></td>
+              <td data-label="상태">${statusText}</td>
+            </tr>
+          `;
+        }).join("")}
+      </tbody>
+    </table>
+  `);
+
+  remainingResult.style.display = "block";
+  remainingResult.innerHTML = html;
 }
 
 function checkNewApplication() {
@@ -467,7 +719,7 @@ function checkNewApplication() {
           <tr>
             <th>장비명</th>
             <th>신규 신청 수량</th>
-            <th>기존 + 신규 수량</th>
+            <th>	신규 + 기존 수량</th>
             <th>보유 수량</th>
             <th>최대 부족 수량</th>
             <th>초과 발생 시간</th>
@@ -476,12 +728,12 @@ function checkNewApplication() {
         <tbody>
           ${conflictItems.map(([name, data]) => `
             <tr>
-              <td>${name}</td>
-              <td><b>${data.newQty}</b></td>
-              <td>${data.maxUsed}</td>
-              <td>${data.stock}</td>
-              <td class="danger">${data.maxShortage}개 부족</td>
-              <td>${data.periods.join("<br>")}</td>
+              <td data-label="장비명">${name}</td>
+              <td data-label="신규 신청 수량"><b>${data.newQty}</b></td>
+              <td data-label="최대 사용 수량">${data.maxUsed}</td>
+              <td data-label="보유 수량">${data.stock}</td>
+              <td data-label="최대 부족 수량" class="danger">${data.maxShortage}개 부족</td>
+              <td data-label="초과 발생 시간">${data.periods.join("<br>")}</td>
             </tr>
           `).join("")}
         </tbody>
@@ -529,7 +781,7 @@ function checkNewApplication() {
           <tr>
             <th>장비명</th>
             <th>신규 신청 수량</th>
-            <th>총 사용 수량</th>
+            <th>신규 + 기존 수량</th>
             <th>보유 수량</th>
             <th>판정</th>
           </tr>
@@ -550,11 +802,11 @@ function checkNewApplication() {
 
             return `
               <tr>
-                <td>${row.name}</td>
-                <td>${row.newQty}</td>
-                <td>${row.used}</td>
-                <td>${row.stock}</td>
-                <td>${statusText}</td>
+                <td data-label="장비명">${row.name}</td>
+                <td data-label="신규 신청 수량">${row.newQty}</td>
+                <td data-label="총 사용 수량">${row.used}</td>
+                <td data-label="보유 수량">${row.stock}</td>
+                <td data-label="판정">${statusText}</td>
               </tr>
             `;
           }).join("")}
