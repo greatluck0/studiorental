@@ -1,7 +1,7 @@
 <!DOCTYPE html>
-<html lang="ko">
-<head>
-<meta charset="UTF-8">
+<!-- saved from url=(0014)about:internet -->
+<html lang="ko"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>장비대여 신규 신청 가능 여부 검사기</title>
 
@@ -223,7 +223,11 @@ th {
     <textarea id="newText" placeholder="신규 신청 1건을 붙여 넣으세요."></textarea>
   </div>
 </div>
-
+<div class="box" style="margin-top:20px;">
+  <h2>신청기간 기준 날짜</h2>
+  <label>기준 날짜</label>
+  <input id="ruleBaseDate" type="date">
+</div>
 <button onclick="checkNewApplication()">신규 신청 가능 여부 확인</button>
 
 <!-- 
@@ -350,6 +354,115 @@ function formatDate(date) {
     hour12: false
   });
 }
+
+function setDefaultRuleBaseDate() {
+  const input = document.getElementById("ruleBaseDate");
+  if (!input || input.value) return;
+
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, "0");
+  const dd = String(today.getDate()).padStart(2, "0");
+
+  input.value = `${yyyy}-${mm}-${dd}`;
+}
+
+function toDateOnly(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function formatDateOnly(date) {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function checkApplicationPeriodRule(newApp) {
+  setDefaultRuleBaseDate();
+
+  const baseInput = document.getElementById("ruleBaseDate");
+  const baseDate = baseInput && baseInput.value
+    ? toDateOnly(new Date(baseInput.value))
+    : toDateOnly(new Date());
+
+  const rentalDate = toDateOnly(newApp.start);
+  const returnDate = toDateOnly(newApp.end);
+
+  const oneDay = 1000 * 60 * 60 * 24;
+  const daysUntilRental = Math.ceil((rentalDate - baseDate) / oneDay);
+  const daysUntilReturn = Math.ceil((returnDate - baseDate) / oneDay);
+  const rentalDuration = Math.ceil((returnDate - rentalDate) / oneDay) + 1;
+
+  let message = "";
+  let ok = false;
+
+  if (rentalDate > returnDate) {
+    message = "❗ 대여일은 반납일보다 앞서야 합니다.";
+  } else if (daysUntilReturn < 0 || daysUntilRental < 0) {
+    message = "⛔ 이미 지난 날짜입니다. 신청 불가";
+  } else if (daysUntilRental < 3) {
+    message = "⚠️ 대여일 기준 3일 전까지 신청해야 합니다. 신청 불가";
+  } else if (daysUntilReturn > 10) {
+    message = "⚠️ 반납일 기준 10일 전부터만 신청할 수 있습니다. 신청 불가";
+  } else if (rentalDuration > 3) {
+    message = "⚠️ 대여 기간은 최대 3일까지 가능합니다. 신청 불가";
+  } else {
+    message = "✅ 신청 가능 기간 규정을 준수했습니다.";
+    ok = true;
+  }
+
+return `
+  <div class="section">
+    <h3>신청기간 준수 여부</h3>
+    <p class="${ok ? "safe" : "danger"}" style="font-size:20px; margin-bottom:10px;">
+      ${message}
+    </p>
+
+    ${makeTable(`
+      <table>
+        <thead>
+          <tr>
+            <th>항목</th>
+            <th>값</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td data-label="항목">기준 날짜</td>
+            <td data-label="값">${formatDateOnly(baseDate)}</td>
+          </tr>
+          <tr>
+            <td data-label="항목">대여일</td>
+            <td data-label="값">${formatDateOnly(rentalDate)}</td>
+          </tr>
+          <tr>
+            <td data-label="항목">반납일</td>
+            <td data-label="값">${formatDateOnly(returnDate)}</td>
+          </tr>
+<!--
+          <tr>
+            <td data-label="항목">대여 기간</td>
+            <td data-label="값">${rentalDuration}일</td>
+          </tr>
+          <tr>
+            <td data-label="항목">대여일까지 남은 기간</td>
+            <td data-label="값">${daysUntilRental}일</td>
+          </tr>
+          <tr>
+            <td data-label="항목">반납일까지 남은 기간</td>
+            <td data-label="값">${daysUntilReturn}일</td>
+          </tr>
+--!>
+        </tbody>
+      </table>
+<br><br>
+    `)}
+  </div>
+`;
+}
+
+document.addEventListener("DOMContentLoaded", setDefaultRuleBaseDate);
 
 function makeTable(html) {
   return `<div class="table-wrap">${html}</div>`;
@@ -704,11 +817,13 @@ function checkNewApplication() {
 
   let html = "";
 
+html += checkApplicationPeriodRule(newApp);
+
   if (isApproved) {
-    html += `<h2 class="safe">최종 판정: 신규 신청 승인 가능</h2>`;
+    html += `<h2 class="safe">장비 최종 판정: 신규 신청 승인 가능</h2>`;
     html += `<p>신규 신청 기간 전체를 시간대별로 나누어 검사한 결과, 보유 수량을 초과하는 장비가 없습니다.</p>`;
   } else {
-    html += `<h2 class="danger">최종 판정: 신규 신청 승인 불가</h2>`;
+    html += `<h2 class="danger">장비 최종 판정: 신규 신청 승인 불가</h2>`;
     html += `<p>신규 신청 기간 중 일부 시간대에서 학과 보유 수량을 초과합니다.</p>`;
 
     html += `<h3>초과 장비 요약</h3>`;
@@ -821,5 +936,6 @@ function checkNewApplication() {
 }
 </script>
 
-</body>
-</html>
+
+
+</body></html>
