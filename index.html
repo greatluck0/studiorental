@@ -820,11 +820,15 @@ function checkNewApplication() {
 html += checkApplicationPeriodRule(newApp);
 
   if (isApproved) {
+    html += `<div class="section">`;
     html += `<h2 class="safe">장비 최종 판정: 신규 신청 승인 가능</h2>`;
     html += `<p>신규 신청 기간 전체를 시간대별로 나누어 검사한 결과, 보유 수량을 초과하는 장비가 없습니다.</p>`;
+    html += `</div class="section">`;
   } else {
+    html += `<div class="section">`;
     html += `<h2 class="danger">장비 최종 판정: 신규 신청 승인 불가</h2>`;
     html += `<p>신규 신청 기간 중 일부 시간대에서 학과 보유 수량을 초과합니다.</p>`;
+    html += `</div class="section">`;
 
     html += `<h3>초과 장비 요약</h3>`;
 
