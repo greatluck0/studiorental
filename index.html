@@ -600,6 +600,62 @@
   }
   .empty-state .icon { font-size: 32px; margin-bottom: 12px; }
 
+  .duplicate-warning {
+    background: var(--red-dim);
+    border: 1px solid var(--red);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 14px;
+    font-size: 13px;
+    color: var(--text);
+  }
+  .duplicate-warning-title {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-weight: 600;
+    color: var(--red);
+    font-size: 13px;
+    margin-bottom: 8px;
+  }
+  .duplicate-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .duplicate-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 10px;
+    background: rgba(196,26,26,0.06);
+    border: 1px solid rgba(196,26,26,0.2);
+    border-radius: 7px;
+    flex-wrap: wrap;
+  }
+  .duplicate-name {
+    font-weight: 600;
+    color: var(--text);
+    font-size: 13px;
+    min-width: 80px;
+  }
+  .duplicate-period {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text2);
+    flex: 1;
+  }
+  .duplicate-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+    background: var(--red);
+    color: #fff;
+    flex-shrink: 0;
+    letter-spacing: 0.3px;
+  }
+
   .unknown-warning {
     background: var(--orange-dim);
     border: 1px solid var(--orange);
@@ -966,6 +1022,33 @@ function normalizeName(name) {
   return name.replace(/\s+/g, " ").trim();
 }
 
+function detectDuplicates(apps) {
+  // 이름 + 대여일시 + 반납일시가 동일한 항목을 중복으로 판단
+  const seen = {};
+  const duplicates = [];
+  apps.forEach((a, i) => {
+    const key = `${a.borrowerName.replace(/\s+/g,'').toLowerCase()}__${a.start.getTime()}__${a.end.getTime()}`;
+    if (!seen[key]) {
+      seen[key] = [i];
+    } else {
+      seen[key].push(i);
+    }
+  });
+  Object.values(seen).forEach(indices => {
+    if (indices.length > 1) {
+      const a = apps[indices[0]];
+      duplicates.push({
+        name: a.borrowerName,
+        start: a.start,
+        end: a.end,
+        count: indices.length,
+        indices
+      });
+    }
+  });
+  return duplicates;
+}
+
 function parseApplications(text) {
   const blocks = text.split(/(?=\[장비대여 신청\])/g)
     .filter(b => b.includes("대여일시:"));
@@ -1078,14 +1161,30 @@ function analyze() {
       if (inventory[name] === undefined) unknownSet.add(name);
     });
   });
-  renderResults(segments, [...unknownSet]);
+
+  const duplicates = detectDuplicates(apps);
+  renderResults(segments, [...unknownSet], duplicates);
 }
 
-function renderResults(segments, unknownItems = []) {
+function renderResults(segments, unknownItems = [], duplicates = []) {
   const resultsEl = document.getElementById('results');
 
   const totalRenters = new Set();
   segments.forEach(s => s.active.forEach(a => totalRenters.add(a.borrowerName)));
+
+  const duplicateWarning = duplicates.length > 0 ? `
+    <div class="duplicate-warning">
+      <div class="duplicate-warning-title">⚠ 중복 신청 ${duplicates.length}건 감지</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px;">이름과 대여·반납 시간이 완전히 동일한 신청건이 여러 번 입력되었습니다. 수량이 중복 합산되어 현황이 부정확할 수 있습니다.</div>
+      <div class="duplicate-list">
+        ${duplicates.map(d => `
+          <div class="duplicate-item">
+            <span class="duplicate-name">${d.name}</span>
+            <span class="duplicate-period">${formatDT(d.start)} ~ ${formatDT(d.end)}</span>
+            <span class="duplicate-badge">${d.count}회 입력</span>
+          </div>`).join('')}
+      </div>
+    </div>` : '';
 
   const unknownWarning = unknownItems.length > 0 ? `
     <div class="unknown-warning">
@@ -1096,7 +1195,7 @@ function renderResults(segments, unknownItems = []) {
       </div>
     </div>` : '';
 
-  let html = `${unknownWarning}
+  let html = `${duplicateWarning}${unknownWarning}
     <div class="results-header">
       <span class="results-title">분석 결과 — ${segments.length}개 시간 구간</span>
       <span class="results-meta">${formatDT(segments[0].segStart)} ~ ${formatDT(segments[segments.length-1].segEnd)}</span>
