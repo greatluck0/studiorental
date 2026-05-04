@@ -362,7 +362,12 @@
     border-radius: 8px;
     gap: 8px;
   }
-  .equip-row.unavail { opacity: 0.4; }
+  .equip-row.unavail {
+    border-color: var(--orange);
+    background: var(--orange-dim);
+    animation: pulse-orange 1.8s ease-in-out infinite;
+  }
+  .equip-row.unavail .equip-name { color: var(--orange); font-weight: 600; }
   .equip-row.over {
     border-color: var(--red);
     background: var(--red-dim);
@@ -373,6 +378,10 @@
     0%, 100% { box-shadow: 0 0 0 0 rgba(240,79,79,0); }
     50%       { box-shadow: 0 0 0 3px rgba(220,38,38,0.2); }
   }
+  @keyframes pulse-orange {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(184,92,0,0); }
+    50%       { box-shadow: 0 0 0 3px rgba(184,92,0,0.2); }
+  }
   .over-badge {
     font-size: 10px;
     font-weight: 700;
@@ -380,6 +389,17 @@
     padding: 2px 6px;
     border-radius: 4px;
     background: var(--red);
+    color: #fff;
+    flex-shrink: 0;
+    margin-right: 4px;
+  }
+  .unavail-badge {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: var(--orange);
     color: #fff;
     flex-shrink: 0;
     margin-right: 4px;
@@ -1097,19 +1117,14 @@ function renderResults(segments, unknownItems = []) {
       </div>
     </div>
 
-    <div class="legend">
-      <span class="legend-title">사용 / 보유</span>
-      <span class="legend-item"><span class="frac-used-zero">0</span><span class="frac-sep">/</span><span class="frac-total">N</span> 미사용</span>
-      <span class="legend-item"><span class="frac-used-ok">N</span><span class="frac-sep">/</span><span class="frac-total">N</span> 여유 있음</span>
-      <span class="legend-item"><span class="frac-used-warn">N</span><span class="frac-sep">/</span><span class="frac-total">N</span> 1개 남음</span>
-      <span class="legend-item"><span class="frac-used-full">N</span><span class="frac-sep">/</span><span class="frac-total">N</span> 품절</span>
-    </div>
+
     <div class="legend">
       <span class="legend-title">사용 / 보유</span>
       <span class="legend-item"><span class="frac-used-zero">0</span><span class="frac-sep">/</span><span class="frac-total">N</span><span>미사용</span></span>
       <span class="legend-item"><span class="frac-used-ok">1</span><span class="frac-sep">/</span><span class="frac-total">N</span><span>여유 있음</span></span>
       <span class="legend-item"><span class="frac-used-warn">N-1</span><span class="frac-sep">/</span><span class="frac-total">N</span><span>1개 남음</span></span>
       <span class="legend-item"><span class="frac-used-full">N</span><span class="frac-sep">/</span><span class="frac-total">N</span><span>품절</span></span>
+      <span class="legend-item"><span class="unavail-badge">품절</span><span>품절 강조</span></span>
       <span class="legend-item"><span class="over-badge">+N초과</span><span>수량 초과</span></span>
     </div>
     <div class="filter-bar">
@@ -1141,7 +1156,7 @@ function renderResults(segments, unknownItems = []) {
       const cls = e.avail > 1 ? 'count-ok' : e.avail === 1 ? 'count-warn' : 'count-zero';
       const unavailCls = e.avail < 0 ? 'over' : e.avail === 0 ? 'unavail' : '';
       const usedCls = e.avail < 0 ? 'frac-used-over' : e.used === 0 ? 'frac-used-zero' : e.avail === 0 ? 'frac-used-full' : e.avail === 1 ? 'frac-used-warn' : 'frac-used-ok';
-      const overBadge = e.avail < 0 ? `<span class="over-badge">+${Math.abs(e.avail)}초과</span>` : '';
+      const overBadge = e.avail < 0 ? `<span class="over-badge">+${Math.abs(e.avail)}초과</span>` : e.avail === 0 && e.used > 0 ? `<span class="unavail-badge">품절</span>` : '';
       const label = `${overBadge}<span class="${usedCls}">${e.used}</span><span class="frac-sep">/</span><span class="frac-total">${e.stock}</span>`;
       const renters = seg.active
         .filter(a => a.items[e.name] > 0)
